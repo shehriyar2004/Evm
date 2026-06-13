@@ -1,0 +1,10 @@
+Flask==2.2.5
+Flask-SocketIO==5.3.2
+Flask-Mail==0.9.1
+eventlet==0.33.2
+paho-mqtt==1.6.1
+bcrypt==4.0.1
+pyotp==2.8.0
+pyjwt==2.8.0
+python-dotenv==1.0.0
+cryptography==41.0.3

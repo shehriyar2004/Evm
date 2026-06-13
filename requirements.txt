@@ -1,0 +1,9 @@
+flask
+flask-socketio
+paho-mqtt
+bcrypt
+pyotp
+python-dotenv
+requests
+cryptography
+pyshark

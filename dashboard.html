@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Election Dashboard | Secure E-Voting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --secondary: #10B981;
+            --dark: #0F172A;
+            --light: #F8FAFC;
+            --card-bg: #1E293B;
+            --text-main: #E2E8F0;
+            --text-muted: #94A3B8;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 24px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        /* Table Styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 12px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 16px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .party-badge {
+            background-color: rgba(79, 70, 229, 0.2);
+            color: #818CF8;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .vote-count {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--secondary);
+        }
+
+        /* Status Pill */
+        .status {
+            display: inline-flex;
+            align-items: center;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--secondary);
+            padding: 6px 16px;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--secondary);
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 10px var(--secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        #last-updated {
+            display: block;
+            text-align: center;
+            margin-top: 40px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Modal Styling */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 10% auto;
+            padding: 30px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 20px;
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+            animation: slideDown 0.4s ease-out;
+            position: relative;
+        }
+
+        @keyframes slideDown {
+            from {
+                top: -100px;
+                opacity: 0;
+            }
+
+            to {
+                top: 0;
+                opacity: 1;
+            }
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Live Election Results</h1>
+            <p>Secure · Transparent · Real-time</p>
+            <div class="status">
+                <div class="status-dot"></div>
+                <span id="status-text">System Live via Secure Socket</span>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Table Section -->
+            <div class="card">
+                <h2>Candidate Standings</h2>
+                <div style="overflow-x: auto;">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th>Candidate Name</th>
+                                <th>Party Affiliation</th>
+                                <th>Total Votes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows will be injected by JS -->
+                            <tr>
+                                <td colspan="3" style="text-align:center;">Loading data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Chart Section -->
+            <div class="card">
+                <h2>Vote Distribution</h2>
+                <canvas id="voteChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Security Report Section (Initially Hidden) -->
+        <!-- Security Report Modal -->
+        <div id="reportModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2 style="color: #F59E0B; border-bottom: 2px solid #F59E0B;">🛡️ Network Security Audit Report</h2>
+                <pre id="security-report-text"
+                    style="white-space: pre-wrap; font-family: 'Outfit', sans-serif; color: #E2E8F0; font-size: 1rem; line-height: 1.6; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 10px;"></pre>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button onclick="closeModal()"
+                        style="background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600;">Close
+                        Report</button>
+                </div>
+            </div>
+        </div>
+
+        <span id="last-updated">Waiting for updates...</span>
+    </div>
+
+    <script>
+        const socket = io();
+        const tableBody = document.querySelector('#results-table tbody');
+        const lastUpdated = document.getElementById('last-updated');
+        let voteChart = null;
+
+        // Initialize Chart
+        function initChart() {
+            const ctx = document.getElementById('voteChart').getContext('2d');
+            voteChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            '#4F46E5', '#10B981', '#F59E0B', '#EF4444',
+                            '#8B5CF6', '#EC4899', '#06B6D4'
+                        ],
+                        borderWidth: 0,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#94A3B8',
+                                padding: 20
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        let isElectionEnded = false;
+
+        function updateDashboard(data) {
+            // ONLY UPDATE IF ELECTION ENDED
+            if (!isElectionEnded && !data.election_ended) {
+                let statusText = "System Idle";
+                let noteText = "Waiting for updates...";
+
+                if (data.election_status === "NOT_STARTED") {
+                    statusText = "Waiting for Election to Start";
+                    noteText = data.message || "Administrator has not started the election yet.";
+                } else if (data.type === 'vote_cast') {
+                    statusText = `Election In Progress - Total Votes: ${data.total_votes}`;
+                    noteText = "Results will be broadcasted after election ends.";
+                } else {
+                    statusText = "Election In Progress - Results Hidden";
+                    noteText = data.message || "Results will be broadcasted after election ends.";
+                }
+
+                document.getElementById('status-text').innerText = statusText;
+                document.getElementById('last-updated').innerText = noteText;
+
+                // Clear table
+                tableBody.innerHTML = `<tr><td colspan="3" style="text-align:center;">${noteText}</td></tr>`;
+
+                // Clear Chart if not started
+                if (voteChart && data.election_status === "NOT_STARTED") {
+                    voteChart.data.labels = [];
+                    voteChart.data.datasets[0].data = [];
+                    voteChart.update();
+                }
+                return;
+            }
+
+            // If we are here, election has ended or data has full results (rare during runtime unless bug)
+            // Or message type is ELECTION_ENDED
+
+            // Update timestamp
+            const ts = new Date(data.timestamp || Date.now()).toLocaleTimeString();
+            lastUpdated.innerText = `Last Updated: ${ts}`;
+
+            // Sort results by votes descending
+            const results = data.results || [];
+
+            // Update Table
+            tableBody.innerHTML = '';
+            results.sort((a, b) => b.votes - a.votes).forEach(candidate => {
+                const row = `
+                    <tr>
+                        <td style="font-weight: 500; color: #fff;">${candidate.name}</td>
+                        <td><span class="party-badge">${candidate.party}</span></td>
+                        <td class="vote-count">${candidate.votes.toLocaleString()}</td>
+                    </tr>
+                `;
+                tableBody.insertAdjacentHTML('beforeend', row);
+            });
+
+            // Update Chart
+            if (voteChart) {
+                voteChart.data.labels = results.map(c => c.name);
+                voteChart.data.datasets[0].data = results.map(c => c.votes);
+                voteChart.update();
+            }
+
+            // Update Security Report
+            // Update Security Report
+            const modal = document.getElementById('reportModal');
+            const reportText = document.getElementById('security-report-text');
+
+            if (data.report || data.layman_report) {
+                // Prioritize layman report if available, else standard report
+                const r = data.layman_report || data.report;
+                reportText.innerText = r;
+
+                // Auto-open ONLY if this is the explicit "ELECTION_ENDED" event
+                if (data.type === 'ELECTION_ENDED') {
+                    modal.style.display = "block";
+                }
+            }
+        }
+
+        // Socket Events
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('vote_update', (msg) => {
+            console.log('New vote update received');
+            const data = JSON.parse(msg);
+
+            if (data.type === 'ELECTION_ENDED' || data.election_ended) {
+                isElectionEnded = true;
+                document.getElementById('status-text').innerText = "Election Ended - Final Results";
+            }
+
+            updateDashboard(data);
+        });
+
+        // Initial Fetch (REST Fallback)
+        fetch('/results')
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    if (data.election_ended) {
+                        isElectionEnded = true;
+                        document.getElementById('status-text').innerText = "Election Ended - Final Results";
+                    }
+                    updateDashboard(data);
+                }
+            })
+            .catch(err => console.error("Error fetching initial results:", err));
+
+        // Modal functions
+        function closeModal() {
+            document.getElementById('reportModal').style.display = "none";
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('reportModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+
+        // Add a button to view report manually if it exists
+        function addViewReportButton() {
+            const container = document.querySelector('.container');
+            if (!document.getElementById('view-report-btn')) {
+                const btn = document.createElement('button');
+                btn.id = 'view-report-btn';
+                btn.innerText = '🛡️ View Security Report';
+                btn.style.cssText = "display: block; margin: 20px auto; background: transparent; border: 1px solid #F59E0B; color: #F59E0B; padding: 10px 20px; border-radius: 30px; cursor: pointer; font-family: 'Outfit', sans-serif;";
+                btn.onclick = function () {
+                    const txt = document.getElementById('security-report-text').innerText;
+                    if (txt) document.getElementById('reportModal').style.display = "block";
+                    else alert("No security report available yet.");
+                };
+                container.appendChild(btn);
+            }
+        }
+
+        // Initialize
+        initChart();
+        addViewReportButton();
+    </script>
+</body>
+
+</html>
